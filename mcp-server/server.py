@@ -22,14 +22,6 @@ from mcp.server.fastmcp import FastMCP
 # Initialize FastMCP
 mcp = FastMCP("tambo-pulse-medical")
 
-# CRITICAL EMERGENCY FIX: Monkey-patch the MCP SDK's internal security checks.
-# The SDK's DNS rebinding protection rejects production Host headers like 'onrender.com',
-# leading to the 421 Misdirected Request error. By forcing these validators to return True,
-# we allow the production handshake to complete.
-from mcp.server.transport_security import TransportSecurityMiddleware
-TransportSecurityMiddleware._validate_host = lambda self, host: True
-TransportSecurityMiddleware._validate_origin = lambda self, origin: True
-
 def log_debug(msg):
     try:
         log_file = os.path.join(os.path.dirname(__file__), "mcp_debug.log")
@@ -137,18 +129,18 @@ def get_memory_resource(key: str) -> str:
     description="Get aggregated statistics by department.",
 )
 async def get_department_summary():
-    print("🛠️  TOOL CALL: get_department_summary()")
+    log_debug("🛠️  TOOL CALL: get_department_summary()")
     if patients_df.empty:
         return {"error": "No data"}
     
     summary = []
-    for dept in patients_df["department"].unique():
+    for dept in sorted(patients_df["department"].unique()):
         dept_df = patients_df[patients_df["department"] == dept]
         summary.append({
-            "department": dept,
-            "total_patients": len(dept_df),
-            "avg_risk": round(dept_df["risk_score"].mean(), 3),
-            "high_risk_count": len(dept_df[dept_df["risk_score"] >= 0.7]),
+            "department": str(dept),
+            "total_patients": int(len(dept_df)),
+            "avg_risk": float(round(dept_df["risk_score"].mean(), 3)),
+            "high_risk_count": int(len(dept_df[dept_df["risk_score"] >= 0.7])),
         })
     
     memory_key = f"dept_summary_{datetime.now().strftime('%H%M%S')}"
@@ -157,9 +149,10 @@ async def get_department_summary():
     }
     MEMORY_STORE[memory_key] = json.dumps(data_to_store)
     
-    print(f"✅ Summary generated, memory_key: {memory_key}")
+    log_debug(f"✅ Summary generated, memory_key: {memory_key} ({len(summary)} departments)")
     return {
-        "memory_key": memory_key
+        "memory_key": memory_key,
+        "count": len(summary)
     }
 
 # --- MCP INTEGRATION ENGINE ---
@@ -188,9 +181,9 @@ async def health_check():
 # This prevents Starlette/FastAPI's Mount() logic from triggering redirects.
 try:
     sse_subapp = mcp.sse_app()
-    # Copy routes directly to the main app's router
+    # Direct integration into router to ensure correct matching without prefix issues
     for route in sse_subapp.routes:
-        app.routes.append(route)
+        app.router.routes.append(route)
     print("✅ MCP Routes integrated directly into main app")
 except Exception as e:
     print(f"⚠️  Route integration failed: {e}")
