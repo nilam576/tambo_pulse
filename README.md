@@ -1,67 +1,65 @@
-# Tambo Pulse 🏥
+# 🚑 Tambo Pulse: Clinical Command Center
 
-**Generative UI Medical Command Center for High-Stakes Clinical Operations.**
+**Tambo Pulse** is a next-generation clinical operations dashboard designed for modern hospital command centers. It leverages **Generative UI** and the **Model Context Protocol (MCP)** to provide real-time patient monitoring, predictive risk analysis, and resource optimization in a high-tech, cinematic interface.
 
-Built for "The UI Strikes Back" Tambo Hackathon.
-
-## 🚀 The Vision
-In a medical crisis, every second counts. Traditional hospital dashboards are static, complex, and require manual navigation through thousands of records. **Tambo Pulse** changes the game by using **Generative UI** to dynamically render the exact components a clinical lead needs, based on natural language intent.
-
-## 🛠️ The Problem
-- **Data Overload**: Hospitals generate millions of data points; clinical leads only need actionable subsets.
-- **Context Switching**: Navigating between tables, charts, and simulations slows down decision-making.
-- **LLM Context Limits**: Sending 10,000 patient records to an LLM is impossible.
-
-## 💡 The Solution
-Tambo Pulse leverages the **Tambo Generative UI SDK** to solve these challenges:
-1.  **Memory Store Strategy**: We handle **10,000+ patient records** by serving them via an MCP backend that stores them in Tambo's high-performance Memory Store. The LLM only sees a `memoryKey`, never the raw data.
-2.  **Generative UI**: AI decides when to show a virtualized `PatientTable`, a `RiskHeatmap`, or a `TreatmentSimulator`.
-3.  **State Roundtrip**: Our custom components (like the Simulator) feed user adjustments back to the AI in real-time, triggering automated risk recalculations.
-
-## 🏗️ Architecture
-```text
-[ User Prompt ] <---> [ Tambo SDK (React) ] <---> [ FastMCP (Python) ]
-  "Show high risk"          |                          |
-                            +---> [ Memory Store ] <---+ [ 10k Records ]
-                                    (patients.json)
-```
-
-## 🌟 Technical Highlights
-- **MCP (Model Context Protocol)**: Python backend serving real-time medical data via SSE.
-- **Virtualized Rendering**: `TanStack Virtual` handles thousands of rows with 60fps performance.
-- **Zod-Powered Schemas**: Type-safe component props that the AI understands perfectly.
-- **Real-time Feedback**: System-level messages allow UI components to "talk back" to the AI.
-
-## 🚦 Quick Start
-
-### 1. Prerequisites
-- Node.js 18+
-- Python 3.10+
-- Tambo API Key
-
-### 2. Backend Setup
-```bash
-cd mcp-server
-pip install -r requirements.txt
-python data/generate_patients.py  # Generates 10k records
-python server.py                  # Starts backend on :8000
-```
-
-### 3. Frontend Setup
-```bash
-npm install
-npm run dev                       # Starts dashboard on :3000
-```
-
-## 🧪 Demo Flow
-1.  **"Show all high-risk ICU patients"** -> Renders `PatientTable` with 400+ rows.
-2.  **"Show risk distribution by department"** -> Renders `RiskHeatmap`.
-3.  **"What if we reduce staffing?"** -> Renders `TreatmentSimulator`.
-4.  **Adjust Sliders** -> AI automatically responds with updated medical recommendations.
-
-## 🛡️ Why Tambo?
-Tambo allowed us to build a complex medical interface in hours instead of weeks. By decoupling the UI logic from the data handling, we created an interface that feels like a "Protocol Droid" for hospital management.
+![Version](https://img.shields.io/badge/version-4.0.2_OS-red)
+![Node](https://img.shields.io/badge/Node-Active-emerald)
+![Framework](https://img.shields.io/badge/Framework-Next.js%2014-blue)
 
 ---
 
-**Tambo Hackathon 2024** • May the components be with you.
+## 📽️ Features
+
+### 1. Cinematic Landing Experience
+A futuristic entrance to the command center featuring glassmorphism, carbon-fiber textures, and staggered motion-UI animations.
+
+### 2. High-Risk Patient Monitoring (`PatientTable`)
+*   **Virtualized Performance**: Optimized for 10,000+ records using `@tanstack/react-virtual`.
+*   **Intelligent recovery**: If the AI forgets to structure its response, the dashboard automatically scans the message for memory keys and recovers the visualizer.
+*   **Risk Scoring**: Real-time visualization of patient risk levels (0-100%).
+
+### 3. Department Analytics (`RiskHeatmap`)
+*   **Distribution Analysis**: Visualizes average risk scores across hospital departments (ICU, ER, Neurology, etc.).
+*   **Direct MCP Integration**: Fetches aggregated statistics directly from the medical MCP server.
+
+### 4. Unit Resource Optimizer (`TreatmentSimulator`)
+*   **"What-If" Analysis**: Simulate the impact of staffing levels and bed availability on patient safety.
+*   **Predictive Metrics**: Real-time calculation of Risk Index and Patient Experience (PX) scores.
+
+---
+
+## 🛠️ The Tech Stack
+
+- **Frontend**: Next.js 14, React 18, Tailwind CSS, Recharts.
+- **AI Core**: `@tambo-ai/react`, `@tambo-ai/react/mcp`.
+- **Backend (MCP Server)**: Python, FastAPI mcp-server-fastmcp, Pandas.
+- **Data Persistence**: Python MCP Memory Store for handling clinical cohorts.
+
+---
+
+## 🚀 Deployment Guide
+
+### 1. Backend (MCP Server on Render)
+- **Repo Root**: `mcp-server/`
+- **Build Command**: `pip install -r requirements.txt`
+- **Start Command**: `python server.py`
+- **Environment Variables**:
+  - `PORT`: 8000
+
+### 2. Frontend (Next.js on Vercel)
+- **Framework**: Next.js
+- **Environment Variables**:
+  - `NEXT_PUBLIC_TAMBO_API_KEY`: Your Tambo project key.
+  - `NEXT_PUBLIC_MCP_SERVER_URL`: `https://your-backend.onrender.com/mcp/sse`
+
+---
+
+## 🛠️ High-Availability Mode
+The dashboard is built with a **High-Availability (HA) Strategy**. If the MCP server is unreachable, the components automatically switch to an **Intelligent Demo Mode** to ensure authorized personnel always have a functional interface for briefings.
+
+---
+
+## 📝 Authorized Access
+> **Note**: Version 4.0.2_OS is intended for authorized clinical personnel only. All interactions are logged via the Tambo Protocol.
+
+© 2026 Tambo Medical Systems
