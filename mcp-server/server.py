@@ -151,7 +151,8 @@ async def get_department_summary():
     }
 
 # Standard FastAPI entry point
-# redirect_slashes=False is important to prevent ASGI-level 307 redirects for the /sse route
+# We use redirect_slashes=False to prevent the 307/404 loop for the /sse route.
+# We also bind the handlers directly instead of using mount() to avoid sub-app complexity.
 app = FastAPI(title="Tambo Pulse MCP Server", redirect_slashes=False)
 
 app.add_middleware(
@@ -166,15 +167,15 @@ app.add_middleware(
 async def health_check():
     return {"status": "healthy"}
 
-# Mount the MCP SSE app at the root.
-# This means the internal '/sse' route is exposed at https://domain/sse
-# and the internal '/messages/' route is exposed at https://domain/messages/
-app.mount("/", mcp.sse_app())
+# Direct MCP Handlers bypass the mounting/prefix issues
+# FastMCP exposes these methods which we can bind directly to FastAPI
+app.add_route("/sse", mcp.sse_endpoint, methods=["GET"])
+app.mount("/messages/", mcp.handle_post_message)
 
 if __name__ == "__main__":
     import uvicorn
     import os
     port = int(os.getenv("PORT", 8000))
     print(f"🚀 Starting Tambo Pulse MCP Server on port {port}")
-    # proxy_headers=True is mandatory for Render to correctly identify protocol and host
+    # Always use proxy_headers=True for Render deployments
     uvicorn.run(app, host="0.0.0.0", port=port, proxy_headers=True, forwarded_allow_ips="*")
