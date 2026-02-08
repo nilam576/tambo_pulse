@@ -142,25 +142,32 @@ async def get_department_summary():
         "memory_key": memory_key
     }
 
+from starlette.applications import Starlette
+from starlette.routing import Route, Mount
+from starlette.middleware import Middleware
+from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
 
-from starlette.responses import JSONResponse
-
-# Use the native FastMCP app (Starlette) to avoid mounting issues and 307 redirects
-app = mcp.sse_app()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
+# Health check handler
 async def health_check(request):
     return JSONResponse({"status": "healthy"})
 
-app.add_route("/health", health_check, methods=["GET"])
+# Use manual Starlette app construction for precise routing control
+app = Starlette(
+    routes=[
+        Route("/health", health_check),
+        Mount("/sse", mcp.sse_app()),  # Explicitly mount SSE at /sse
+    ],
+    middleware=[
+        Middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+    ]
+)
 
 if __name__ == "__main__":
     import uvicorn
