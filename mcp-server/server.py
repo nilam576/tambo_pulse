@@ -214,10 +214,17 @@ async def health_check():
         "patch": "v2.1"
     }
 
-# MOUNT THE MCP ENGINE
-# This is the cleanest pattern: mount as a sub-app at root (/)
-# This handles /sse and /messages paths automatically with SDK-native logic.
-app.mount("/", mcp.sse_app())
+# --- DIRECT ROUTE INTEGRATION (SOCIALLY CORRECT MOUNTING) ---
+# We manually extract the routes from the MCP sub-app and inject them into the main FastAPI router.
+# This ensures they are wrapped by our CORSMiddleware and Streaming Middleware.
+try:
+    mcp_app = mcp.sse_app()
+    for route in mcp_app.routes:
+        # Prevent duplicates and ensure correct matching
+        app.router.routes.append(route)
+    log_debug("🚀 MCP Routes (SSE/Messages) integrated directly into main app router")
+except Exception as e:
+    log_debug(f"⚠️  MCP Integration Error: {e}")
 
 if __name__ == "__main__":
     import uvicorn
