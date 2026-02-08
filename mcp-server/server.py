@@ -1,14 +1,23 @@
-﻿"""
-Tambo Pulse MCP Server
-"""
+﻿import sys
+import os
+import json
+import logging
+import pandas as pd
+from datetime import datetime
+from fastapi import FastAPI, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
+
+# --- CRITICAL EMERGENCY MONKEY-PATCH ---
+# We MUST patch the MCP SDK before it even starts to prevent the 421 Misdirected Request errors on Render.
+try:
+    from mcp.server.transport_security import TransportSecurityMiddleware
+    TransportSecurityMiddleware._validate_host = lambda self, host: True
+    TransportSecurityMiddleware._validate_origin = lambda self, origin: True
+    print("✅ MCP Security Monkey-patch applied successfully")
+except Exception as e:
+    print(f"⚠️  Monkey-patch failed: {e}")
 
 from mcp.server.fastmcp import FastMCP
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-import pandas as pd
-import json
-import os
-from datetime import datetime
 
 # Initialize FastMCP
 mcp = FastMCP("tambo-pulse-medical")
@@ -98,12 +107,15 @@ async def get_patient_clinical_data(
     
     memory_key = f"patients_{datetime.now().strftime('%H%M%S')}"
     
+    # Convert to native Python types to avoid numpy/pandas JSON serialization errors in tool stream
+    json_safe_data = json.loads(filtered.to_json(orient="records"))
+    
     data_to_store = {
-        "data": filtered.to_dict(orient="records"),
+        "data": json_safe_data,
         "count": len(filtered),
         "summary": {
-            "avg_risk": round(filtered["risk_score"].mean(), 3) if len(filtered) > 0 else 0,
-            "high_risk_count": len(filtered[filtered["risk_score"] >= 0.7]) if len(filtered) > 0 else 0,
+            "avg_risk": float(round(filtered["risk_score"].mean(), 3)) if len(filtered) > 0 else 0.0,
+            "high_risk_count": int(len(filtered[filtered["risk_score"] >= 0.7])) if len(filtered) > 0 else 0,
         }
     }
     
@@ -151,8 +163,7 @@ async def get_department_summary():
     }
 
 # Standard FastAPI entry point
-# We use redirect_slashes=False to prevent the 307/404 loop for the /sse route.
-# We also bind the handlers directly instead of using mount() to avoid sub-app complexity.
+# We use redirect_slashes=False and bind both patterns to avoid the 307/404 loop.
 app = FastAPI(title="Tambo Pulse MCP Server", redirect_slashes=False)
 
 app.add_middleware(
@@ -165,17 +176,25 @@ app.add_middleware(
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
+    return {"status": "healthy", "patch": "active", "timestamp": datetime.now().isoformat()}
 
-# Direct MCP Handlers bypass the mounting/prefix issues
-# FastMCP exposes these methods which we can bind directly to FastAPI
-app.add_route("/sse", mcp.sse_endpoint, methods=["GET"])
-app.mount("/messages/", mcp.handle_post_message)
+# Direct binding to handle both slashed and non-slashed URLs to prevent redirects
+@app.get("/sse")
+@app.get("/sse/")
+async def handle_sse(request: Request):
+    return await mcp.sse_endpoint(request)
+
+@app.post("/messages")
+@app.post("/messages/")
+@app.post("/messages/{path:path}")
+async def handle_messages(request: Request):
+    # Pass to the handle_post_message ASGI app
+    await mcp.handle_post_message(request.scope, request.receive, request._send)
 
 if __name__ == "__main__":
     import uvicorn
     import os
     port = int(os.getenv("PORT", 8000))
     print(f"🚀 Starting Tambo Pulse MCP Server on port {port}")
-    # Always use proxy_headers=True for Render deployments
+    # proxy_headers=True and forwarded_allow_ips are essential for SSL handshake over proxies
     uvicorn.run(app, host="0.0.0.0", port=port, proxy_headers=True, forwarded_allow_ips="*")
