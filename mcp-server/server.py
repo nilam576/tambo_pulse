@@ -142,6 +142,8 @@ async def get_department_summary():
         "memory_key": memory_key
     }
 
+from starlette.responses import JSONResponse
+
 # Consolidate into a single app instance to avoid path/prefix issues on Render
 app = mcp.sse_app()
 
@@ -153,9 +155,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy"}
+@app.route("/health")
+async def health_check(request):
+    return JSONResponse({"status": "healthy"})
 
 if __name__ == "__main__":
     import uvicorn
