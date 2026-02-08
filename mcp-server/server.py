@@ -142,8 +142,8 @@ async def get_department_summary():
         "memory_key": memory_key
     }
 
-# Standard FastAPI entry point
-app = FastAPI(title="Tambo Pulse MCP Server")
+# Standard FastAPI entry point with trailing slash fix
+app = FastAPI(title="Tambo Pulse MCP Server", redirect_slashes=False)
 
 app.add_middleware(
     CORSMiddleware,
@@ -159,7 +159,7 @@ async def health_check():
     return {"status": "healthy"}
 
 # Mount the MCP SSE app at the root. 
-# This exposes the internal '/sse' endpoint at the top level: https://domain/sse
+# redirect_slashes=False prevents the 307 redirect cycle for /sse
 app.mount("/", mcp.sse_app())
 
 if __name__ == "__main__":
@@ -167,5 +167,5 @@ if __name__ == "__main__":
     import os
     port = int(os.getenv("PORT", 8000))
     print(f"🚀 Starting Tambo Pulse MCP Server on port {port}")
-    # proxy_headers=True is critical for Render
+    # proxy_headers=True and forwarded_allow_ips="*" are MANDATORY for Render
     uvicorn.run(app, host="0.0.0.0", port=port, proxy_headers=True, forwarded_allow_ips="*")
