@@ -1,0 +1,6 @@
+X_NON_ASCII_X: D:\tambo_hack\tambo-pulse\app_log.txt
+X_NON_ASCII_X: D:\tambo_hack\tambo-pulse\build_error.txt
+X_NON_ASCII_X: D:\tambo_hack\tambo-pulse\DEMO_SCRIPT.md
+X_NON_ASCII_X: D:\tambo_hack\tambo-pulse\port_log.txt
+X_NON_ASCII_X: D:\tambo_hack\tambo-pulse\README.md
+X_NON_ASCII_X: D:\tambo_hack\tambo-pulse\tsc_errors.txt

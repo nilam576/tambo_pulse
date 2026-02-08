@@ -1,0 +1,9 @@
+X_FOUND_X: D:\tambo_hack\tambo-pulse\app_log.txt
+X_FOUND_X: D:\tambo_hack\tambo-pulse\build_error.txt
+X_FOUND_X: D:\tambo_hack\tambo-pulse\DEMO_SCRIPT.md
+X_FOUND_X: D:\tambo_hack\tambo-pulse\port_log.txt
+X_FOUND_X: D:\tambo_hack\tambo-pulse\README.md
+X_FOUND_X: D:\tambo_hack\tambo-pulse\tsc_errors.txt
+X_FOUND_X: D:\tambo_hack\tambo-pulse\mcp-server\server.py
+X_FOUND_X: D:\tambo_hack\tambo-pulse\mcp-server\test_server.py
+X_FOUND_X: D:\tambo_hack\tambo-pulse\mcp-server\data\generate_patients.py

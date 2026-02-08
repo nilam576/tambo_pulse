@@ -1,0 +1,8 @@
+﻿src/components/ai/PatientTable/index.tsx(53,43): error TS2339: Property 'text' does not exist on type '{ uri: string; text: string; mimeType?: string; _meta?: { [x: string]: unknown; }; } | { uri: string; blob: string; mimeType?: string; _meta?: { [x: string]: unknown; }; }'.
+  Property 'text' does not exist on type '{ uri: string; blob: string; mimeType?: string; _meta?: { [x: string]: unknown; }; }'.
+src/components/ai/PatientTable/index.tsx(55,56): error TS2339: Property 'text' does not exist on type '{ uri: string; text: string; mimeType?: string; _meta?: { [x: string]: unknown; }; } | { uri: string; blob: string; mimeType?: string; _meta?: { [x: string]: unknown; }; }'.
+  Property 'text' does not exist on type '{ uri: string; blob: string; mimeType?: string; _meta?: { [x: string]: unknown; }; }'.
+src/components/ai/RiskHeatmap/index.tsx(40,43): error TS2339: Property 'text' does not exist on type '{ uri: string; text: string; mimeType?: string; _meta?: { [x: string]: unknown; }; } | { uri: string; blob: string; mimeType?: string; _meta?: { [x: string]: unknown; }; }'.
+  Property 'text' does not exist on type '{ uri: string; blob: string; mimeType?: string; _meta?: { [x: string]: unknown; }; }'.
+src/components/ai/RiskHeatmap/index.tsx(42,56): error TS2339: Property 'text' does not exist on type '{ uri: string; text: string; mimeType?: string; _meta?: { [x: string]: unknown; }; } | { uri: string; blob: string; mimeType?: string; _meta?: { [x: string]: unknown; }; }'.
+  Property 'text' does not exist on type '{ uri: string; blob: string; mimeType?: string; _meta?: { [x: string]: unknown; }; }'.

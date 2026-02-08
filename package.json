@@ -1,0 +1,41 @@
+{
+  "name": "tambo-pulse",
+  "version": "1.0.0",
+  "description": "Generative UI Medical Command Center - Tambo Hackathon",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.3",
+    "@tambo-ai/react": "latest",
+    "@tanstack/react-table": "^8.21.3",
+    "@tanstack/react-virtual": "^3.13.18",
+    "@valibot/to-json-schema": "^1.5.0",
+    "arktype": "^2.1.29",
+    "clsx": "^2.1.1",
+    "effect": "^3.19.15",
+    "next": "^14.2.35",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "^2.15.4",
+    "sury": "^10.0.4",
+    "tailwindcss-animate": "^1.0.7",
+    "valibot": "^1.2.0",
+    "zod": "^3.25.76",
+    "zod-to-json-schema": "^3.25.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.0",
+    "eslint": "^8.0.0",
+    "eslint-config-next": "^14.2.0",
+    "postcss": "^8.4.0",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.4.0"
+  }
+}

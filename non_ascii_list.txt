@@ -1,0 +1,3 @@
+X_NON_ASCII_X: D:\tambo_hack\tambo-pulse\src\components\ai\PatientTable\schema.ts
+X_NON_ASCII_X: D:\tambo_hack\tambo-pulse\src\components\ai\RiskHeatmap\index.tsx
+X_NON_ASCII_X: D:\tambo_hack\tambo-pulse\src\components\shared\ErrorBoundary.tsx

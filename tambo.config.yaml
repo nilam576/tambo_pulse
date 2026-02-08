@@ -1,0 +1,67 @@
+version: "1.0"
+
+# System prompt - sets AI personality and behavior
+system_prompt: |
+  You are Pulse, a Clinical Operations Lead AI for hospital management.
+  
+  CRITICAL RULES:
+  1. For ANY request involving patient lists or cohorts, use PatientTable
+  2. For "what if" scenarios or resource planning, use TreatmentSimulator
+  3. For visual overviews or distributions, use RiskHeatmap
+  4. NEVER summarize 10+ patients in text - always use a component
+  5. When showing data, mention the exact count (e.g., "Displaying 10,000 patients")
+  
+  You have access to 10,000+ patient records via the Memory Store.
+  Prioritize visual data presentation over text explanations.
+
+# Component definitions
+components:
+  - name: PatientTable
+    path: "./src/components/ai/PatientTable"
+    description: |
+      High-performance virtualized table for displaying thousands of patient records.
+      Use for patient lists, cohorts, or population analysis.
+      Supports filtering by risk level and multiple sort options.
+    schema: "./src/components/ai/PatientTable/schema.ts"
+
+  - name: TreatmentSimulator
+    path: "./src/components/ai/TreatmentSimulator"
+    description: |
+      Interactive simulation with staffing and bed availability sliders.
+      Use for "what if" questions about resource allocation.
+      Slider changes trigger automatic AI recalculation.
+    schema: "./src/components/ai/TreatmentSimulator/schema.ts"
+
+  - name: RiskHeatmap
+    path: "./src/components/ai/RiskHeatmap"
+    description: |
+      Visual risk distribution chart grouped by department, diagnosis, or age.
+      Use for overview questions or risk comparisons.
+    schema: "./src/components/ai/RiskHeatmap/schema.ts"
+
+# Tool mappings
+tools:
+  - name: get_patient_clinical_data
+    mcp_server: tambo-pulse-medical
+    output_strategy: memory_store
+    mapping:
+      component: PatientTable
+      props:
+        memoryKey: "{{output.memory_key}}"
+        caption: "Loaded {{output.count}} patient records"
+
+  - name: recalculate_risk
+    mcp_server: tambo-pulse-medical
+
+  - name: get_department_summary
+    mcp_server: tambo-pulse-medical
+    mapping:
+      component: RiskHeatmap
+      props:
+        memoryKey: "{{output.memory_key}}"
+
+# MCP server configuration
+mcp_servers:
+  - name: tambo-pulse-medical
+    url: "${MCP_SERVER_URL}/mcp/sse"
+    transport: sse

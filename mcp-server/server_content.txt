@@ -1,0 +1,268 @@
+﻿"""
+Tambo Pulse MCP Server
+Serves 10,000 patient records with Memory Store optimization
+"""
+
+from mcp.server.fastmcp import FastMCP
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+import pandas as pd
+import json
+import os
+from datetime import datetime
+
+# Initialize FastMCP
+mcp = FastMCP("tambo-pulse-medical")
+
+# Load patient data at startup
+DATA_PATH = os.path.join(os.path.dirname(__file__), "data", "patients.json")
+
+try:
+    with open(DATA_PATH, "r") as f:
+        PATIENTS = json.load(f)
+    patients_df = pd.DataFrame(PATIENTS)
+    print(f"✅ Loaded {len(PATIENTS):,} patient records")
+except FileNotFoundError:
+    print("⚠️  patients.json not found. Run generate_patients.py first.")
+    PATIENTS = []
+    patients_df = pd.DataFrame()
+
+
+@mcp.tool(
+    name="get_patient_clinical_data",
+    description="""Fetches clinical records for hospital population. 
+    Handles 10,000+ rows efficiently using Tambo Memory Store.
+    Use this for any patient list, cohort analysis, or population overview.""",
+)
+async def get_patient_clinical_data(
+    department: str | None = None,
+    risk_threshold: float | None = None,
+    diagnosis_code: str | None = None,
+    age_min: int | None = None,
+    age_max: int | None = None,
+    limit: int | None = None,
+):
+    """
+    Fetch patient records with optional filters.
+    
+    Args:
+        department: Filter by department (ICU, ER, Cardiology, Oncology, General, Neurology, Pediatrics)
+        risk_threshold: Only return patients with risk_score >= threshold (0.0-1.0)
+        diagnosis_code: Filter by ICD-10 diagnosis code prefix (e.g., "E11" for diabetes)
+        age_min: Minimum patient age
+        age_max: Maximum patient age
+        limit: Maximum number of records to return
+    
+    Returns:
+        Patient records with memory_key for frontend subscription
+    """
+    if patients_df.empty:
+        return {"error": "No patient data loaded", "memory_key": None, "count": 0, "data": []}
+    
+    filtered = patients_df.copy()
+    
+    # Apply filters
+    if department:
+        filtered = filtered[filtered["department"] == department]
+    if risk_threshold is not None:
+        filtered = filtered[filtered["risk_score"] >= risk_threshold]
+    if diagnosis_code:
+        filtered = filtered[filtered["diagnosis"].str.startswith(diagnosis_code)]
+    if age_min is not None:
+        filtered = filtered[filtered["age"] >= age_min]
+    if age_max is not None:
+        filtered = filtered[filtered["age"] <= age_max]
+    if limit:
+        filtered = filtered.head(limit)
+    
+    # Generate unique memory key based on filters
+    filter_parts = []
+    if department:
+        filter_parts.append(department.lower())
+    if risk_threshold:
+        filter_parts.append(f"risk{int(risk_threshold*100)}")
+    if diagnosis_code:
+        filter_parts.append(diagnosis_code)
+    
+    memory_key = f"patients_{'_'.join(filter_parts) if filter_parts else 'all'}_{datetime.now().strftime('%H%M%S')}"
+    
+    # Convert to records
+    records = filtered.to_dict(orient="records")
+    
+    return {
+        "memory_key": memory_key,
+        "count": len(records),
+        "filters_applied": {
+            "department": department,
+            "risk_threshold": risk_threshold,
+            "diagnosis_code": diagnosis_code,
+            "age_range": [age_min, age_max] if age_min or age_max else None,
+        },
+        "summary": {
+            "avg_risk": round(filtered["risk_score"].mean(), 3) if len(filtered) > 0 else 0,
+            "high_risk_count": len(filtered[filtered["risk_score"] >= 0.7]) if len(filtered) > 0 else 0,
+            "departments": filtered["department"].value_counts().to_dict() if len(filtered) > 0 else {},
+        },
+        "data": records,
+    }
+
+
+@mcp.tool(
+    name="recalculate_risk",
+    description="""Recalculates patient risk scores based on resource allocation changes.
+    Use this when the user adjusts staffing levels or bed availability in TreatmentSimulator.""",
+)
+async def recalculate_risk(
+    cohort_memory_key: str,
+    staffing_level: float = 1.0,
+    bed_availability: float = 0.8,
+):
+    """
+    Recalculate risk based on resource constraints.
+    Called when user interacts with TreatmentSimulator sliders.
+    
+    Args:
+        cohort_memory_key: Memory key of the patient cohort being analyzed
+        staffing_level: Staff availability multiplier (0.5-1.5, where 1.0 = 100% baseline)
+        bed_availability: Percentage of beds available (0.0-1.0)
+    
+    Returns:
+        Risk analysis with recommendations
+    """
+    # Validate inputs
+    staffing_level = max(0.5, min(1.5, staffing_level))
+    bed_availability = max(0.0, min(1.0, bed_availability))
+    
+    # Calculate risk multiplier
+    # Lower staffing/beds = higher risk
+    staffing_impact = 1.0 + (1.0 - staffing_level) * 0.5  # 0.5x staff = 1.25x risk
+    bed_impact = 1.0 + (1.0 - bed_availability) * 0.3  # 0% beds = 1.3x risk
+    risk_multiplier = round(staffing_impact * bed_impact, 2)
+    
+    # Determine status levels
+    def get_status(value, thresholds):
+        if value < thresholds[0]:
+            return "CRITICAL"
+        elif value < thresholds[1]:
+            return "WARNING"
+        return "STABLE"
+    
+    staffing_status = get_status(staffing_level, (0.7, 0.9))
+    bed_status = get_status(bed_availability, (0.3, 0.5))
+    
+    # Generate recommendation
+    if staffing_status == "CRITICAL" and bed_status == "CRITICAL":
+        recommendation = "🚨 URGENT: Activate emergency protocols immediately. Consider diverting incoming patients and initiating transfer agreements with nearby facilities."
+        priority = "CRITICAL"
+    elif staffing_status == "CRITICAL" or bed_status == "CRITICAL":
+        recommendation = "⚠️ HIGH ALERT: Defer all elective procedures. Increase monitoring frequency for high-risk patients. Consider calling in off-duty staff."
+        priority = "HIGH"
+    elif staffing_status == "WARNING" or bed_status == "WARNING":
+        recommendation = "📋 CAUTION: Review patient discharge readiness. Prepare contingency staffing plans. Monitor bed turnover closely."
+        priority = "MODERATE"
+    else:
+        recommendation = "✅ STABLE: Current resource allocation is adequate. Continue standard protocols and monitoring."
+        priority = "LOW"
+    
+    # Calculate projected impacts
+    projected_metrics = {
+        "response_time_impact": f"+{int((risk_multiplier - 1) * 100)}%" if risk_multiplier > 1 else "No change",
+        "patient_satisfaction_impact": f"-{int((risk_multiplier - 1) * 50)}%" if risk_multiplier > 1 else "No change",
+        "readmission_risk_impact": f"+{int((risk_multiplier - 1) * 30)}%" if risk_multiplier > 1 else "No change",
+    }
+    
+    return {
+        "cohort_memory_key": cohort_memory_key,
+        "resource_levels": {
+            "staffing": f"{staffing_level * 100:.0f}%",
+            "beds": f"{bed_availability * 100:.0f}%",
+        },
+        "status": {
+            "staffing": staffing_status,
+            "beds": bed_status,
+            "overall": priority,
+        },
+        "risk_multiplier": risk_multiplier,
+        "recommendation": recommendation,
+        "projected_metrics": projected_metrics,
+        "timestamp": datetime.now().isoformat(),
+    }
+
+
+@mcp.tool(
+    name="get_department_summary",
+    description="Get aggregated statistics by department for overview visualizations.",
+)
+async def get_department_summary():
+    """Get summary statistics grouped by department."""
+    if patients_df.empty:
+        return {"error": "No patient data loaded"}
+    
+    summary = []
+    for dept in patients_df["department"].unique():
+        dept_df = patients_df[patients_df["department"] == dept]
+        summary.append({
+            "department": dept,
+            "total_patients": len(dept_df),
+            "avg_risk": round(dept_df["risk_score"].mean(), 3),
+            "high_risk_count": len(dept_df[dept_df["risk_score"] >= 0.7]),
+            "avg_age": round(dept_df["age"].mean(), 1),
+            "avg_los": round(dept_df["estimated_los"].mean(), 1),
+        })
+    
+    return {
+        "memory_key": f"dept_summary_{datetime.now().strftime('%H%M%S')}",
+        "data": sorted(summary, key=lambda x: x["avg_risk"], reverse=True),
+    }
+
+
+# Create FastAPI app for additional endpoints
+app = FastAPI(title="Tambo Pulse MCP Server")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3005", "http://127.0.0.1:3005"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    return {
+        "status": "healthy",
+        "service": "tambo-pulse-medical",
+        "record_count": len(PATIENTS),
+        "timestamp": datetime.now().isoformat(),
+    }
+
+
+@app.get("/stats")
+async def get_stats():
+    """Get overall statistics"""
+    if patients_df.empty:
+        return {"error": "No data loaded"}
+    
+    return {
+        "total_patients": len(patients_df),
+        "high_risk": len(patients_df[patients_df["risk_score"] >= 0.7]),
+        "moderate_risk": len(patients_df[(patients_df["risk_score"] >= 0.4) & (patients_df["risk_score"] < 0.7)]),
+        "low_risk": len(patients_df[patients_df["risk_score"] < 0.4]),
+        "avg_risk": round(patients_df["risk_score"].mean(), 3),
+        "departments": patients_df["department"].value_counts().to_dict(),
+    }
+
+
+# Mount MCP to FastAPI
+app.mount("/mcp", mcp.sse_app())
+
+
+if __name__ == "__main__":
+    import uvicorn
+    print("🚀 Starting Tambo Pulse MCP Server on http://localhost:8000")
+    print("   Health check: http://localhost:8000/health")
+    print("   MCP endpoint: http://localhost:8000/mcp")
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+
