@@ -190,20 +190,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- PROXY STABILITY MIDDLEWARE ---
-@app.middleware("http")
-async def add_streaming_headers(request: Request, call_next):
-    # This prevents Render/Vercel proxies from buffering the SSE stream
-    response = await call_next(request)
-    response.headers["X-Accel-Buffering"] = "no"
-    response.headers["Cache-Control"] = "no-cache, no-transform"
-    return response
-
-@app.get("/favicon.ico")
-@app.get("/favicon.svg")
-async def favicon():
-    return Response(status_code=204)
-
 @app.get("/")
 @app.get("/health")
 async def health_check():
@@ -211,20 +197,35 @@ async def health_check():
         "status": "healthy", 
         "timestamp": datetime.now().isoformat(),
         "mcp_server": "tambo-pulse-medical",
-        "patch": "v2.1"
+        "patch": "v3.0"
     }
 
-# --- DIRECT ROUTE INTEGRATION (SOCIALLY CORRECT MOUNTING) ---
-# We manually extract the routes from the MCP sub-app and inject them into the main FastAPI router.
-# This ensures they are wrapped by our CORSMiddleware and Streaming Middleware.
-try:
-    mcp_app = mcp.sse_app()
-    for route in mcp_app.routes:
-        # Prevent duplicates and ensure correct matching
-        app.router.routes.append(route)
-    log_debug("🚀 MCP Routes (SSE/Messages) integrated directly into main app router")
-except Exception as e:
-    log_debug(f"⚠️  MCP Integration Error: {e}")
+# --- THE ULTIMATE CORS & STREAM ENFORCER ---
+@app.middleware("http")
+async def force_cors_and_streaming(request: Request, call_next):
+    # Handle preflight OPTIONS requests manually if needed, 
+    # but primarily ensure headers are present on EVERY response.
+    if request.method == "OPTIONS":
+        response = Response(status_code=204)
+    else:
+        response = await call_next(request)
+    
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+    response.headers["X-Accel-Buffering"] = "no"
+    response.headers["Cache-Control"] = "no-cache, no-transform"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
+
+@app.options("/{rest_of_path:path}")
+async def options_handler(rest_of_path: str):
+    return Response(status_code=204)
+
+# MOUNT THE MCP ENGINE
+# This is the SDK-native pattern. Combined with the middleware above, 
+# it guarantees connectivity and stream stability.
+app.mount("/", mcp.sse_app())
 
 if __name__ == "__main__":
     import uvicorn
