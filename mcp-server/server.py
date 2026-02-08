@@ -11,7 +11,14 @@ import os
 from datetime import datetime
 
 # Initialize FastMCP
-mcp = FastMCP("tambo-pulse-medical")
+from mcp.server.transport_security import TransportSecuritySettings
+
+# Initialize FastMCP with DNS rebinding protection DISABLED
+# Required for Render/Cloudflare production environments
+mcp = FastMCP(
+    "tambo-pulse-medical",
+    transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False)
+)
 
 def log_debug(msg):
     try:
@@ -143,7 +150,8 @@ async def get_department_summary():
     }
 
 # Standard FastAPI entry point with trailing slash fix
-app = FastAPI(title="Tambo Pulse MCP Server", redirect_slashes=False)
+# Standard FastAPI entry point
+app = FastAPI(title="Tambo Pulse MCP Server")
 
 app.add_middleware(
     CORSMiddleware,
@@ -157,30 +165,14 @@ app.add_middleware(
 async def health_check():
     return {"status": "healthy"}
 
-# Emergency Fix: Custom SSE handler to bypass SDK host validation
-async def custom_sse_handler(request):
-    # Clone the scope and lie about the host to satisfy the SDK's internal validator
-    # The SDK is rejecting 'tambo-pulse.onrender.com' as an invalid host
-    scope = dict(request.scope)
-    headers = list(scope.get("headers", []))
-    
-    # Filter out existing Host header and inject a "safe" one
-    new_headers = [(k, v) for k, v in headers if k.lower() != b"host"]
-    new_headers.append((b"host", b"localhost:8000"))
-    scope["headers"] = new_headers
-    
-    # Import the internal handler from FastMCP if possible, or use the app's own endpoint
-    # We use the internal handle_sse which is more flexible
-    from mcp.server.fastmcp.server import handle_sse
-    return await handle_sse(scope, request.receive, request._send)
-
-# Add the bypass route
-app.add_route("/sse", custom_sse_handler, methods=["GET", "POST"])
+# Mount the MCP SSE app using standard mounting
+# Now that rebinding protection is OFF, this will work on Render
+app.mount("/sse", mcp.sse_app())
 
 if __name__ == "__main__":
     import uvicorn
     import os
     port = int(os.getenv("PORT", 8000))
     print(f"🚀 Starting Tambo Pulse MCP Server on port {port}")
-    # Still keep proxy headers for health and other routes
+    # Force trust for Render's proxy headers
     uvicorn.run(app, host="0.0.0.0", port=port, proxy_headers=True, forwarded_allow_ips="*")
