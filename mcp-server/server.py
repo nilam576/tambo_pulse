@@ -142,8 +142,8 @@ async def get_department_summary():
         "memory_key": memory_key
     }
 
-# FastAPI app
-app = FastAPI(title="Tambo Pulse MCP Server")
+# Consolidate into a single app instance to avoid path/prefix issues on Render
+app = mcp.sse_app()
 
 app.add_middleware(
     CORSMiddleware,
@@ -156,19 +156,6 @@ app.add_middleware(
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
-
-# Expose SSE with explicit CORS for the sub-app
-mcp_sse_app = mcp.sse_app()
-mcp_sse_app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Mount MCP
-app.mount("/mcp", mcp_sse_app)
 
 if __name__ == "__main__":
     import uvicorn
