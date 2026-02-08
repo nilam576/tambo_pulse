@@ -108,33 +108,31 @@ async def get_patient_clinical_data(
     if len(filtered) == 0:
         log_debug("⚠️  Result is 0.")
     
-    # Truncate to 25 records for the AI Engine to guarantee 100% stream safety.
-    # The full cohort is still saved in the Memory Store for UI display.
-    ai_safe_limit = 25
-    display_count = min(len(filtered), ai_safe_limit)
+    # Truncate to 10 records for the AI Engine (Ultra-Safe Mode).
+    # The browser still gets the full dataset via the Memory Key.
+    ai_safe_limit = 10
     truncated = filtered.head(ai_safe_limit)
     
     import uuid
     memory_key = f"patients_{datetime.now().strftime('%H%M%S')}_{uuid.uuid4().hex[:4]}"
     
-    # Store FULL dataset for UI, but send ONLY truncated to AI
+    # Clean JSON for UI & AI
     json_safe_data_ui = json.loads(filtered.to_json(orient="records"))
     json_safe_data_ai = json.loads(truncated.to_json(orient="records"))
     
-    data_to_store = {
+    MEMORY_STORE[memory_key] = json.dumps({
         "status": "success",
         "data": json_safe_data_ui,
-        "total_count": int(len(filtered)),
-    }
+        "total_count": int(len(filtered))
+    })
     
-    MEMORY_STORE[memory_key] = json.dumps(data_to_store)
     log_debug(f"✅ Created memory_key: {memory_key} ({len(filtered)} records)")
     
     return {
         "memory_key": memory_key,
-        "sample_count": int(display_count),
         "total_count": int(len(filtered)),
-        "data_sample": json_safe_data_ai
+        "data_sample": json_safe_data_ai,
+        "note": f"Full dataset of {len(filtered)} patients is available in the UI via the memory_key."
     }
 
 @mcp.resource("memory://{key}")
@@ -154,23 +152,29 @@ async def get_department_summary():
     summary = []
     for dept in sorted(patients_df["department"].unique()):
         dept_df = patients_df[patients_df["department"] == dept]
+        count = len(dept_df)
+        avg_risk = float(dept_df["risk_score"].mean()) if count > 0 else 0.0
+        # Sanitize NaN
+        if pd.isna(avg_risk): avg_risk = 0.0
+        
         summary.append({
             "department": str(dept),
-            "total_patients": int(len(dept_df)),
-            "avg_risk": float(round(dept_df["risk_score"].mean(), 3)),
-            "high_risk_count": int(len(dept_df[dept_df["risk_score"] >= 0.7])),
+            "total_patients": int(count),
+            "avg_risk": float(round(avg_risk, 3)),
+            "high_risk_count": int(len(dept_df[dept_df["risk_score"] >= 0.7])) if count > 0 else 0,
         })
     
-    memory_key = f"dept_summary_{datetime.now().strftime('%H%M%S')}"
-    data_to_store = {
-        "data": sorted(summary, key=lambda x: x["avg_risk"], reverse=True)
-    }
-    MEMORY_STORE[memory_key] = json.dumps(data_to_store)
+    # Sort for the AI
+    summary = sorted(summary, key=lambda x: x["avg_risk"], reverse=True)
     
-    log_debug(f"✅ Summary generated, memory_key: {memory_key} ({len(summary)} departments)")
+    memory_key = f"dept_summary_{datetime.now().strftime('%H%M%S')}"
+    MEMORY_STORE[memory_key] = json.dumps({"data": summary})
+    
+    log_debug(f"✅ Summary generated: {len(summary)} depts")
     return {
         "memory_key": memory_key,
-        "count": len(summary)
+        "summary_data": summary,
+        "description": "Risk distribution across hospital departments."
     }
 
 # --- MCP INTEGRATION ENGINE ---
@@ -185,6 +189,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# --- PROXY STABILITY MIDDLEWARE ---
+@app.middleware("http")
+async def add_streaming_headers(request: Request, call_next):
+    # This prevents Render/Vercel proxies from buffering the SSE stream
+    response = await call_next(request)
+    response.headers["X-Accel-Buffering"] = "no"
+    response.headers["Cache-Control"] = "no-cache, no-transform"
+    return response
+
+@app.get("/favicon.ico")
+@app.get("/favicon.svg")
+async def favicon():
+    return Response(status_code=204)
 
 @app.get("/")
 @app.get("/health")
