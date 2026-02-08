@@ -23,13 +23,8 @@ from mcp.server.fastmcp import FastMCP
 mcp = FastMCP("tambo-pulse-medical")
 
 def log_debug(msg):
-    try:
-        log_file = os.path.join(os.path.dirname(__file__), "mcp_debug.log")
-        with open(log_file, "a", encoding="utf-8") as f:
-            f.write(f"[{datetime.now().isoformat()}] {msg}\n")
-    except:
-        pass
-    print(msg)
+    # Only print to stdout for Render/Cloud platforms to avoid I/O bottlenecks
+    print(f"DEBUG: {msg}")
 
 # In-memory store for cohorts
 MEMORY_STORE = {}
@@ -39,11 +34,11 @@ DATA_PATH = os.path.join(os.path.dirname(__file__), "data", "patients.json")
 
 try:
     with open(DATA_PATH, "r") as f:
-        PATIENTS = json.load(f)
+        data = json.load(f)
+    # Ensure data is a list of native Python dicts
+    PATIENTS = data if isinstance(data, list) else []
     patients_df = pd.DataFrame(PATIENTS)
     log_debug(f"✅ Loaded {len(PATIENTS):,} patient records")
-    if not patients_df.empty:
-        log_debug(f"📊 Data Stats: Max Risk={patients_df['risk_score'].max()}, Count >= 0.7: {len(patients_df[patients_df['risk_score'] >= 0.7])}")
 except Exception as e:
     log_debug(f"⚠️  Error loading patients.json: {e}")
     PATIENTS = []
@@ -94,17 +89,25 @@ async def get_patient_clinical_data(
         log_debug(f"❌ Filtering Error: {e}")
 
     if len(filtered) == 0:
-        log_debug("⚠️  Result is 0. Sample data head:")
-        log_debug(str(patients_df[["department", "risk_score"]].head()))
+        log_debug("⚠️  Result is 0.")
     
-    memory_key = f"patients_{datetime.now().strftime('%H%M%S')}"
+    # Truncate to 500 records to ensure the AI engine stays within Vercel's 10s timeout limits
+    # The full data is still stored in the memory key for the UI components.
+    safe_limit = 500
+    display_count = min(len(filtered), safe_limit)
+    truncated = filtered.head(safe_limit)
     
-    # Convert to native Python types to avoid numpy/pandas JSON serialization errors in tool stream
-    json_safe_data = json.loads(filtered.to_json(orient="records"))
+    import uuid
+    memory_key = f"patients_{datetime.now().strftime('%H%M%S')}_{uuid.uuid4().hex[:4]}"
+    
+    # Convert to pure native types
+    json_safe_data = json.loads(truncated.to_json(orient="records"))
     
     data_to_store = {
+        "status": "success",
         "data": json_safe_data,
-        "count": len(filtered),
+        "total_count": int(len(filtered)),
+        "display_count": int(display_count),
         "summary": {
             "avg_risk": float(round(filtered["risk_score"].mean(), 3)) if len(filtered) > 0 else 0.0,
             "high_risk_count": int(len(filtered[filtered["risk_score"] >= 0.7])) if len(filtered) > 0 else 0,
@@ -112,11 +115,12 @@ async def get_patient_clinical_data(
     }
     
     MEMORY_STORE[memory_key] = json.dumps(data_to_store)
-    log_debug(f"✅ Created memory_key: {memory_key} with {len(filtered)} records")
+    log_debug(f"✅ Memory Key: {memory_key} ({display_count}/{len(filtered)} records)")
     
     return {
         "memory_key": memory_key,
-        "count": len(filtered)
+        "count": int(len(filtered)),
+        "description": f"Showing {display_count} of {len(filtered)} patients filtered for {department or 'all departments'}."
     }
 
 @mcp.resource("memory://{key}")
@@ -168,12 +172,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/")
 @app.get("/health")
 async def health_check():
     return {
         "status": "healthy", 
         "timestamp": datetime.now().isoformat(),
-        "mcp_patch": "active"
+        "mcp_server": "tambo-pulse-medical",
+        "patch": "v2.1"
     }
 
 # DEFUSE THE 307 REDIRECT & 421 MISDIRECTED REQUEST ERRORS:
