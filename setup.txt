@@ -1,0 +1,214 @@
+================================================================================
+                         TAMBO PULSE - SETUP GUIDE
+================================================================================
+
+A clinical operations dashboard with AI-powered patient monitoring.
+
+================================================================================
+STEP 1: PREREQUISITES
+================================================================================
+
+Required Software:
+- Node.js (v18 or higher) - https://nodejs.org
+- Python (v3.9 or higher) - https://python.org
+- npm (comes with Node.js) or yarn
+- Git
+
+Verify installations:
+    node --version
+    python --version
+    npm --version
+
+================================================================================
+STEP 2: PROJECT SETUP
+================================================================================
+
+1. Navigate to the project directory:
+    cd tambo_pulse
+
+2. The .env file has already been created with the following variables:
+    NEXT_PUBLIC_TAMBO_API_KEY="tambo_E7A/EB0X8SzudO0ouKC1i80lIFPj4/gBp2rjGvAlOkg/peeEMHD3hxR3Ba0BcKioBgKc+uDmYpveNvVG4dVomFI5AkCpUI1efyN8nKA1kbc="
+    NEXT_PUBLIC_MCP_SERVER_URL=http://127.0.0.1:8000/mcp/sse
+    MCP_SERVER_URL=http://127.0.0.1:8000
+    DATABASE_URL=sqlite:///./patients.db
+    NEXT_PUBLIC_APP_NAME=Tambo Pulse
+
+================================================================================
+STEP 3: BACKEND (MCP SERVER) SETUP
+================================================================================
+
+1. Navigate to the MCP server directory:
+    cd mcp-server
+
+2. Create a Python virtual environment:
+    # On Windows:
+    python -m venv venv
+    
+    # On Mac/Linux:
+    python3 -m venv venv
+
+3. Activate the virtual environment:
+    # On Windows (Command Prompt):
+    venv\Scripts\activate
+    
+    # On Windows (PowerShell):
+    venv\Scripts\Activate.ps1
+    
+    # On Mac/Linux:
+    source venv/bin/activate
+
+4. Install Python dependencies:
+    pip install -r requirements.txt
+
+5. Start the MCP server:
+    python server.py
+
+The backend will start on: http://127.0.0.1:8000
+
+Keep this terminal window open!
+
+================================================================================
+STEP 4: FRONTEND (NEXT.JS) SETUP
+================================================================================
+
+1. Open a NEW terminal window/tab
+
+2. Navigate to the project root:
+    cd tambo_pulse
+
+3. Install Node.js dependencies:
+    npm install
+
+4. Start the development server:
+    npm run dev
+
+The frontend will start on: http://localhost:3000
+
+Keep this terminal window open!
+
+================================================================================
+STEP 5: ACCESS THE APPLICATION
+================================================================================
+
+1. Open your browser and go to:
+    http://localhost:3000
+
+2. You should see the Tambo Pulse landing page with:
+   - Cinematic glassmorphism UI
+   - "Initialize Pulse Protocol" button
+   - High-tech medical command center theme
+
+3. Click "Initialize Pulse Protocol" to access the dashboard
+
+================================================================================
+STEP 6: VERIFYING THE SETUP
+================================================================================
+
+Test the application by:
+
+1. Check backend health:
+    curl http://127.0.0.1:8000/health
+    
+    Expected: {"status": "healthy"}
+
+2. Try AI commands in the dashboard:
+   - "Show me high-risk patients"
+   - "Display patient cohort"
+   - "What if we increase ICU beds by 5?"
+   - "Show risk distribution by department"
+
+3. Components should load:
+   - PatientTable (virtualized patient list)
+   - RiskHeatmap (department risk visualization)
+   - TreatmentSimulator (resource planning)
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+Issue: Backend won't start
+- Check if port 8000 is already in use
+- Kill existing process: npx kill-port 8000
+- Verify Python version: python --version (needs 3.9+)
+
+Issue: Frontend won't start
+- Check if port 3000 is already in use
+- Kill existing process: npx kill-port 3000
+- Delete node_modules and reinstall: rm -rf node_modules && npm install
+
+Issue: MCP server connection error
+- Verify backend is running on port 8000
+- Check .env file has correct MCP_SERVER_URL
+- The app has demo mode and will work without backend
+
+Issue: Python dependencies fail
+- Ensure virtual environment is activated
+- Upgrade pip: pip install --upgrade pip
+- Install packages individually if needed
+
+================================================================================
+STOPPING THE SERVERS
+================================================================================
+
+To stop the servers:
+
+1. Press Ctrl+C in the frontend terminal (Next.js)
+2. Press Ctrl+C in the backend terminal (MCP server)
+3. Deactivate Python virtual environment:
+    deactivate
+
+================================================================================
+DEVELOPMENT COMMANDS
+================================================================================
+
+Frontend commands (run from project root):
+    npm run dev      - Start development server
+    npm run build    - Build for production
+    npm run start    - Start production server
+    npm run lint     - Run ESLint
+
+Backend commands (run from mcp-server/):
+    python server.py              - Start MCP server
+    python check_data.py          - Verify patient data
+    python test_server.py         - Run server tests
+
+================================================================================
+PROJECT STRUCTURE
+================================================================================
+
+tambo_pulse/
+├── .env                    # Environment variables (already set up)
+├── package.json            # Node.js dependencies
+├── next.config.mjs         # Next.js configuration
+├── src/                    # Frontend source code
+│   ├── app/               # Next.js app router
+│   ├── components/        # React components
+│   │   └── ai/           # AI components (PatientTable, etc.)
+│   └── lib/              # Utility functions
+├── mcp-server/            # Backend MCP server
+│   ├── server.py         # Main server file
+│   ├── requirements.txt  # Python dependencies
+│   └── data/            # Patient data
+└── public/               # Static assets
+
+================================================================================
+IMPORTANT NOTES
+================================================================================
+
+1. Both servers must be running simultaneously
+2. The MCP server uses SQLite for data persistence
+3. The app has High-Availability mode - works without backend
+4. Patient data is synthetic/demo data only
+5. The dashboard uses virtualized tables for 10,000+ records
+
+================================================================================
+SUPPORT
+================================================================================
+
+For issues:
+1. Check app_log.txt for frontend errors
+2. Check server logs for backend errors
+3. Review README.md for detailed documentation
+4. Review DEMO_SCRIPT.md for demo scenarios
+
+================================================================================
