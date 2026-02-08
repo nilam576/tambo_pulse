@@ -15,7 +15,8 @@ mcp = FastMCP("tambo-pulse-medical")
 
 def log_debug(msg):
     try:
-        with open("d:/tambo_hack/tambo-pulse/mcp-server/mcp_debug.log", "a", encoding="utf-8") as f:
+        log_file = os.path.join(os.path.dirname(__file__), "mcp_debug.log")
+        with open(log_file, "a", encoding="utf-8") as f:
             f.write(f"[{datetime.now().isoformat()}] {msg}\n")
     except:
         pass
@@ -156,8 +157,18 @@ app.add_middleware(
 async def health_check():
     return {"status": "healthy"}
 
+# Expose SSE with explicit CORS for the sub-app
+mcp_sse_app = mcp.sse_app()
+mcp_sse_app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Mount MCP
-app.mount("/mcp", mcp.sse_app())
+app.mount("/mcp", mcp_sse_app)
 
 if __name__ == "__main__":
     import uvicorn
