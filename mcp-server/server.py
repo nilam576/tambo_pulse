@@ -162,8 +162,9 @@ async def get_department_summary():
         "memory_key": memory_key
     }
 
+# --- MCP INTEGRATION ENGINE ---
+
 # Standard FastAPI entry point
-# We use redirect_slashes=False and bind both patterns to avoid the 307/404 loop.
 app = FastAPI(title="Tambo Pulse MCP Server", redirect_slashes=False)
 
 app.add_middleware(
@@ -176,25 +177,28 @@ app.add_middleware(
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "patch": "active", "timestamp": datetime.now().isoformat()}
+    return {
+        "status": "healthy", 
+        "timestamp": datetime.now().isoformat(),
+        "mcp_patch": "active"
+    }
 
-# Direct binding to handle both slashed and non-slashed URLs to prevent redirects
-@app.get("/sse")
-@app.get("/sse/")
-async def handle_sse(request: Request):
-    return await mcp.sse_endpoint(request)
-
-@app.post("/messages")
-@app.post("/messages/")
-@app.post("/messages/{path:path}")
-async def handle_messages(request: Request):
-    # Pass to the handle_post_message ASGI app
-    await mcp.handle_post_message(request.scope, request.receive, request._send)
+# DEFUSE THE 307 REDIRECT & 421 MISDIRECTED REQUEST ERRORS:
+# We manually extract the routes from the MCP sub-app and append them to the main app.
+# This prevents Starlette/FastAPI's Mount() logic from triggering redirects.
+try:
+    sse_subapp = mcp.sse_app()
+    # Copy routes directly to the main app's router
+    for route in sse_subapp.routes:
+        app.routes.append(route)
+    print("✅ MCP Routes integrated directly into main app")
+except Exception as e:
+    print(f"⚠️  Route integration failed: {e}")
 
 if __name__ == "__main__":
     import uvicorn
     import os
     port = int(os.getenv("PORT", 8000))
     print(f"🚀 Starting Tambo Pulse MCP Server on port {port}")
-    # proxy_headers=True and forwarded_allow_ips are essential for SSL handshake over proxies
+    # proxy_headers=True is mandatory for Render/Cloudflare handshake stability
     uvicorn.run(app, host="0.0.0.0", port=port, proxy_headers=True, forwarded_allow_ips="*")
