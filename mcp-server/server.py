@@ -159,9 +159,9 @@ app.add_middleware(
 async def health_check():
     return {"status": "healthy"}
 
-# Mount the MCP SSE app at /sse
-# This means requests to /sse will be handled by the MCP SSE handler
-app.mount("/sse", mcp.sse_app())
+# Mount the MCP SSE app at the root
+# The MCP app internally handles /sse, so mounting at / makes it available at /sse
+app.mount("/", mcp.sse_app())
 
 if __name__ == "__main__":
     import uvicorn
