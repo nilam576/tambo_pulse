@@ -45,9 +45,16 @@ except Exception as e:
     patients_df = pd.DataFrame()
 
 @mcp.tool(
+    name="ping_medical_server",
+    description="Verify connectivity to the medical data node.",
+)
+async def ping_medical_server():
+    return {"status": "online", "source": "tambo-pulse-medical-node"}
+
+@mcp.tool(
     name="get_patient_clinical_data",
-    description="""Fetches realistic clinical records for hospital population.
-    Supports filtering by department, risk, and vital signs (SPO2, Heart Rate).""",
+    description="""Fetches clinical records for hospital population. 
+    Supports filtering by department, risk, and vital signs.""",
 )
 async def get_patient_clinical_data(
     department: str | None = None,
@@ -101,36 +108,33 @@ async def get_patient_clinical_data(
     if len(filtered) == 0:
         log_debug("⚠️  Result is 0.")
     
-    # Truncate to 500 records to ensure the AI engine stays within Vercel's 10s timeout limits
-    # The full data is still stored in the memory key for the UI components.
-    safe_limit = 500
-    display_count = min(len(filtered), safe_limit)
-    truncated = filtered.head(safe_limit)
+    # Truncate to 25 records for the AI Engine to guarantee 100% stream safety.
+    # The full cohort is still saved in the Memory Store for UI display.
+    ai_safe_limit = 25
+    display_count = min(len(filtered), ai_safe_limit)
+    truncated = filtered.head(ai_safe_limit)
     
     import uuid
     memory_key = f"patients_{datetime.now().strftime('%H%M%S')}_{uuid.uuid4().hex[:4]}"
     
-    # Convert to pure native types
-    json_safe_data = json.loads(truncated.to_json(orient="records"))
+    # Store FULL dataset for UI, but send ONLY truncated to AI
+    json_safe_data_ui = json.loads(filtered.to_json(orient="records"))
+    json_safe_data_ai = json.loads(truncated.to_json(orient="records"))
     
     data_to_store = {
         "status": "success",
-        "data": json_safe_data,
+        "data": json_safe_data_ui,
         "total_count": int(len(filtered)),
-        "display_count": int(display_count),
-        "summary": {
-            "avg_risk": float(round(filtered["risk_score"].mean(), 3)) if len(filtered) > 0 else 0.0,
-            "high_risk_count": int(len(filtered[filtered["risk_score"] >= 0.7])) if len(filtered) > 0 else 0,
-        }
     }
     
     MEMORY_STORE[memory_key] = json.dumps(data_to_store)
-    log_debug(f"✅ Memory Key: {memory_key} ({display_count}/{len(filtered)} records)")
+    log_debug(f"✅ Created memory_key: {memory_key} ({len(filtered)} records)")
     
     return {
         "memory_key": memory_key,
-        "count": int(len(filtered)),
-        "description": f"Showing {display_count} of {len(filtered)} patients filtered for {department or 'all departments'}."
+        "sample_count": int(display_count),
+        "total_count": int(len(filtered)),
+        "data_sample": json_safe_data_ai
     }
 
 @mcp.resource("memory://{key}")
@@ -192,17 +196,10 @@ async def health_check():
         "patch": "v2.1"
     }
 
-# DEFUSE THE 307 REDIRECT & 421 MISDIRECTED REQUEST ERRORS:
-# We manually extract the routes from the MCP sub-app and append them to the main app.
-# This prevents Starlette/FastAPI's Mount() logic from triggering redirects.
-try:
-    sse_subapp = mcp.sse_app()
-    # Direct integration into router to ensure correct matching without prefix issues
-    for route in sse_subapp.routes:
-        app.router.routes.append(route)
-    print("✅ MCP Routes integrated directly into main app")
-except Exception as e:
-    print(f"⚠️  Route integration failed: {e}")
+# MOUNT THE MCP ENGINE
+# This is the cleanest pattern: mount as a sub-app at root (/)
+# This handles /sse and /messages paths automatically with SDK-native logic.
+app.mount("/", mcp.sse_app())
 
 if __name__ == "__main__":
     import uvicorn
