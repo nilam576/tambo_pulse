@@ -7,7 +7,7 @@ const envSchema = z.object({
 });
 
 export const env = envSchema.parse({
-    TAMBO_API_KEY: process.env.NEXT_PUBLIC_TAMBO_API_KEY || "AIzaSyDGQhZKP_GesfG58IH1pJtCqqwXjfEsNO0",
+    TAMBO_API_KEY: process.env.NEXT_PUBLIC_TAMBO_API_KEY ,
     MCP_SERVER_URL: process.env.MCP_SERVER_URL || "http://127.0.0.1:8000",
     NEXT_PUBLIC_APP_NAME: process.env.NEXT_PUBLIC_APP_NAME || "Tambo Pulse",
 });
