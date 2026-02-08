@@ -146,15 +146,31 @@ export const PatientTable = ({
                                 >
                                     <div className="w-1/4">
                                         <div className="font-bold text-sm text-slate-200">{patient.name}</div>
-                                        <div className="text-[10px] font-mono text-slate-500">{patient.patient_id}</div>
+                                        <div className="flex gap-2 items-center">
+                                            <div className="text-[10px] font-mono text-slate-500">{patient.patient_id}</div>
+                                            <div className="text-[10px] bg-slate-800 px-1 rounded text-slate-400 font-mono">{patient.department}</div>
+                                        </div>
                                     </div>
                                     <div className="w-1/4 text-xs text-slate-400">
                                         {patient.diagnosis?.split('.')[0] || "Unknown"}
                                     </div>
-                                    <div className="w-1/4 text-xs font-mono text-slate-500">
-                                        {patient.department}
+                                    <div className="w-1/4 flex gap-3 text-[10px] font-mono">
+                                        <div className="flex flex-col">
+                                            <span className="text-slate-600 uppercase">SpO2</span>
+                                            <span className={`${patient.vitals?.spo2 < 90 ? 'text-red-400 animate-pulse font-bold' : 'text-emerald-400'}`}>
+                                                {patient.vitals?.spo2 || "--"}%
+                                            </span>
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className="text-slate-600 uppercase">HR</span>
+                                            <span className="text-slate-300">{patient.vitals?.heart_rate || "--"} bpm</span>
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className="text-slate-600 uppercase">BP</span>
+                                            <span className="text-slate-300">{patient.vitals?.bp_systolic}/{patient.vitals?.bp_diastolic}</span>
+                                        </div>
                                     </div>
-                                    <div className="w-1/4 text-right">
+                                    <div className="w-1/8 text-right flex-1">
                                         <span className={`
                                             inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black tracking-wider
                                             ${isCritical ? 'bg-red-500/20 text-red-500 border border-red-500/30' : 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'}
@@ -179,7 +195,13 @@ function generateMockData() {
         patient_id: `SIM-${2000 + i}`,
         risk_score: Math.random(),
         diagnosis: i % 2 === 0 ? "Severe Sepsis (Simulated)" : "Acute Respiratory Failure (Simulated)",
-        department: "ICU (Backup Mode)"
+        department: "ICU (Backup Mode)",
+        vitals: {
+            heart_rate: 70 + Math.floor(Math.random() * 40),
+            spo2: 85 + Math.floor(Math.random() * 15),
+            bp_systolic: 110 + Math.floor(Math.random() * 40),
+            bp_diastolic: 70 + Math.floor(Math.random() * 20)
+        }
     }));
 }
 

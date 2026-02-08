@@ -46,14 +46,16 @@ except Exception as e:
 
 @mcp.tool(
     name="get_patient_clinical_data",
-    description="""Fetches clinical records for hospital population. 
-    Handles 10,000+ rows efficiently using Tambo Memory Store.""",
+    description="""Fetches realistic clinical records for hospital population.
+    Supports filtering by department, risk, and vital signs (SPO2, Heart Rate).""",
 )
 async def get_patient_clinical_data(
     department: str | None = None,
     risk_threshold: float | None = None,
+    min_spo2: int | None = None,
+    max_hr: int | None = None,
 ):
-    log_debug(f"🛠️  TOOL CALL RAW: dept={department} ({type(department)}), risk={risk_threshold} ({type(risk_threshold)})")
+    log_debug(f"🛠️  TOOL CALL: dept={department}, risk={risk_threshold}, spo2={min_spo2}, hr={max_hr}")
     
     if patients_df.empty:
         log_debug("⚠️  Dataframe is empty!")
@@ -79,12 +81,20 @@ async def get_patient_clinical_data(
         if risk_threshold is not None:
             try:
                 rt = float(risk_threshold)
-                # Handle 0-100 scale cases
                 threshold = rt / 100.0 if rt > 1.0 else rt
                 filtered = filtered[filtered["risk_score"] >= threshold]
-                log_debug(f"🔍 Filtered by risk >= {threshold}: {len(filtered)} records left")
-            except ValueError:
-                log_debug(f"⚠️  Invalid risk_threshold type: {type(risk_threshold)}")
+                log_debug(f"🔍 Risk Filter: {len(filtered)} left")
+            except: pass
+
+        # Advanced Medical Filters
+        if min_spo2 is not None:
+            filtered = filtered[filtered["vitals"].apply(lambda x: x.get("spo2", 100)) >= min_spo2]
+            log_debug(f"🔍 SPO2 Filter: {len(filtered)} left")
+            
+        if max_hr is not None:
+            filtered = filtered[filtered["vitals"].apply(lambda x: x.get("heart_rate", 0)) <= max_hr]
+            log_debug(f"🔍 Heart Rate Filter: {len(filtered)} left")
+            
     except Exception as e:
         log_debug(f"❌ Filtering Error: {e}")
 
