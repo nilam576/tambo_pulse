@@ -156,7 +156,8 @@ async def health_check(request):
 app = Starlette(
     routes=[
         Route("/health", health_check),
-        Mount("/sse", mcp.sse_app()),  # Explicitly mount SSE at /sse
+        # Bypass mcp.sse_app() validation and route directly to the endpoint handler
+        Route("/sse", mcp._sse_handler), 
     ],
     middleware=[
         Middleware(
