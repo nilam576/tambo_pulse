@@ -1,0 +1,52 @@
+# Tambo Pulse - Clinical Command Center
+# SEO Robots.txt Configuration
+
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://tambopulse.com/sitemap.xml
+
+# Allow all search engines to crawl everything
+Allow: /api/
+Allow: /_next/
+Allow: /static/
+
+# Optimize crawl rate
+Crawl-delay: 1
+
+# Specific bot optimizations
+User-agent: Googlebot
+Allow: /
+Crawl-delay: 0.5
+
+User-agent: Bingbot
+Allow: /
+Crawl-delay: 1
+
+User-agent: DuckDuckBot
+Allow: /
+Crawl-delay: 1
+
+# AI Bot access for training (optional - enable if you want AI models to learn from your site)
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+# Block potentially harmful bots
+User-agent: MJ12bot
+Disallow: /
+
+User-agent: AhrefsBot
+Disallow: /
+
+User-agent: SemrushBot
+Disallow: /

@@ -1,0 +1,45 @@
+# Tambo Pulse - Vertical GenUI Pitch
+## Quick Reference Card (1-2 min)
+
+---
+
+## OPENING (15 sec)
+**"Hospital command centers face a critical challenge: turning 10,000+ patient records into actionable decisions. Static dashboards fail. Tambo Pulse succeeds."**
+
+---
+
+## THE GENUI DIFFERENCE (30 sec)
+**"Traditional tools force clinicians to navigate menus. Tambo Pulse—built on Tambo's vertical GenUI platform—lets them simply ask."
+
+[DEMO: Type "Show high-risk ICU patients"]
+
+**"Watch: The AI doesn't just search—it generates the perfect interface. A virtualized table appears, filtered, sorted, and medically contextualized. No configuration. No templates. Just intent-driven UI."**
+
+---
+
+## TAMBO POWER (25 sec)
+**"Three components, infinite clinical scenarios:
+- PatientTable for cohorts
+- RiskHeatmap for department views  
+- TreatmentSimulator for resource planning
+
+Powered by Tambo's React SDK and MCP protocol, connecting AI to real patient data in real-time."**
+
+---
+
+## CLOSE (10 sec)
+**"Tambo Pulse: Clinical intelligence meets generative interface design. Built vertical. Powered by Tambo."
+
+[tambo.ai] [github.com/nilam576/tambo_pulse]**
+
+---
+
+## KEY PHRASES TO EMPHASIZE:
+✓ "Vertical Generative UI"
+✓ "Built on Tambo"
+✓ "Intent-driven interfaces"
+✓ "Medical context-aware"
+✓ "Zero configuration"
+
+## VISUAL SEQUENCE:
+1. Problem → 2. Demo Query → 3. Component Generation → 4. Feature Overview → 5. Logo/QR

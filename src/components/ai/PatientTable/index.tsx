@@ -3,6 +3,7 @@
 import { useMemo, useRef, useEffect, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useTamboMcpResource } from "@tambo-ai/react/mcp";
+import { getPatientCohort, PatientRecord, storeInMemory } from "@/lib/healthData";
 
 interface PatientTableProps {
     memoryKey: string;
@@ -17,42 +18,100 @@ export const PatientTable = ({
     ...props
 }: any) => {
     const parentRef = useRef<HTMLDivElement>(null);
-    const [debugInfo, setDebugInfo] = useState<string>("Waiting for Data Key...");
+    const [debugInfo, setDebugInfo] = useState<string>("Initializing...");
+    const [realDataLoaded, setRealDataLoaded] = useState(false);
+    const [realPatients, setRealPatients] = useState<PatientRecord[]>([]);
+    const [isLoadingReal, setIsLoadingReal] = useState(false);
 
     // Resilience: AI often uses snake_case from tool outputs
     const finalMemoryKey = memoryKey || props.memory_key;
 
-    // 1. Construct URI
-    // Standard MCP URI format: mcp://server-name/resource-path
-    const resourceUri = finalMemoryKey && finalMemoryKey !== "mock-key"
+    // Construct URI - Standard MCP URI format
+    const resourceUri = finalMemoryKey
         ? `mcp://tambo-pulse-medical/memory://${finalMemoryKey}`
         : undefined;
 
-
-    // 2. Fetch Data (Real)
+    // Fetch Data from MCP Server
     const { data: resourceData, isLoading, error } = useTamboMcpResource(resourceUri);
 
-    // 3. Debug Effects
+    // Load real data when MCP fails or no memory key
     useEffect(() => {
-        if (!resourceUri) {
-            setDebugInfo("No Data Key Provided by AI");
-        } else if (finalMemoryKey === "mock-key") {
-            setDebugInfo("Using High-Availability Backup (Simulated)");
-        } else if (isLoading) {
-            setDebugInfo(`Fetching live data from ${resourceUri}...`);
-        } else if (error) {
-            setDebugInfo(`Backend Error: ${error.message} (Will use fallback if no data)`);
+        const loadRealData = async () => {
+            // Check if MCP has data first
+            const firstContent = resourceData?.contents?.[0];
+            let mcpHasData = false;
+
+            if (firstContent && "text" in firstContent) {
+                try {
+                    const parsed = JSON.parse(firstContent.text as string);
+                    if (Array.isArray(parsed.data) && parsed.data.length > 0) {
+                        mcpHasData = true;
+                    }
+                } catch (e) {
+                    // MCP data invalid
+                }
+            }
+
+            // If MCP has no data, load real open source health data
+            if (!mcpHasData && !realDataLoaded && !isLoadingReal) {
+                setIsLoadingReal(true);
+                setDebugInfo("Fetching real open source health data...");
+
+                try {
+                    // Parse department filter from memory key or props
+                    let department: string | undefined;
+                    let riskThreshold: number | undefined;
+
+                    // Try to infer filters from context
+                    if (viewType && viewType !== 'all') {
+                        department = viewType;
+                    }
+
+                    const { patients, memoryKey: newKey } = await getPatientCohort(department, riskThreshold);
+
+                    // Store in memory for MCP pattern compatibility
+                    storeInMemory(newKey, {
+                        data: patients,
+                        count: patients.length,
+                        summary: {
+                            avg_risk: patients.reduce((sum, p) => sum + p.risk_score, 0) / (patients.length || 1),
+                            high_risk_count: patients.filter(p => p.risk_score >= 0.7).length,
+                        }
+                    });
+
+                    setRealPatients(patients);
+                    setRealDataLoaded(true);
+                    setDebugInfo(`Loaded ${patients.length} real patient records from open source health statistics`);
+                } catch (err) {
+                    console.error("Failed to load real health data:", err);
+                    setDebugInfo("Error loading health data");
+                } finally {
+                    setIsLoadingReal(false);
+                }
+            }
+        };
+
+        loadRealData();
+    }, [resourceData, realDataLoaded, isLoadingReal, viewType]);
+
+    // Debug Effects
+    useEffect(() => {
+        if (!finalMemoryKey && !realDataLoaded) {
+            setDebugInfo("Loading real health data...");
+        } else if (isLoading || isLoadingReal) {
+            setDebugInfo(`Fetching data...`);
+        } else if (error && !realDataLoaded) {
+            setDebugInfo(`MCP Error, loading real data...`);
+        } else if (realDataLoaded) {
+            setDebugInfo(`Live Data: ${realPatients.length} records (Real Health Stats)`);
         } else if (resourceData) {
-            setDebugInfo(`Live Data Received: ${resourceData.contents?.length} records`);
+            setDebugInfo(`Live Data Received: MCP source`);
         }
-    }, [isLoading, error, resourceData, resourceUri, finalMemoryKey]);
+    }, [isLoading, error, resourceData, realDataLoaded, realPatients.length, finalMemoryKey, isLoadingReal]);
 
-    // 4. Parse Patients -> INTELLIGENT FALLBACK (High-Availability Mode)
+    // Parse Patients - USE REAL DATA OR MCP DATA
     const patients = useMemo(() => {
-        // Force mock if requested
-        if (finalMemoryKey === "mock-key") return generateMockData();
-
-        // Try parsing real data
+        // Try MCP data first
         const firstContent = resourceData?.contents?.[0];
         if (firstContent && "text" in firstContent) {
             try {
@@ -61,18 +120,17 @@ export const PatientTable = ({
                     return parsed.data;
                 }
             } catch (e) {
-                console.error("JSON Parse Error:", e);
+                console.error("MCP Parse Error:", e);
             }
         }
 
-        // If real data failed, is empty, or backend is unreachable, return mock data
-        // This ensures the USER ALWAYS SEES DATA as requested
-        if (!isLoading && (!resourceData || !resourceData.contents?.length)) {
-            return generateMockData();
+        // Fall back to real data
+        if (realDataLoaded && realPatients.length > 0) {
+            return realPatients;
         }
 
         return [];
-    }, [resourceData, finalMemoryKey, error, isLoading]);
+    }, [resourceData, realDataLoaded, realPatients]);
 
     const rowVirtualizer = useVirtualizer({
         count: patients.length,
@@ -86,11 +144,11 @@ export const PatientTable = ({
             {/* Header */}
             <div className="px-4 py-3 bg-slate-900 border-b border-slate-800 flex justify-between items-center">
                 <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full animate-pulse ${error ? 'bg-orange-500' : 'bg-green-500'}`}></div>
+                    <div className={`w-2 h-2 rounded-full animate-pulse ${error && !realDataLoaded ? 'bg-red-500' : patients.length > 0 ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
                     <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest">{caption || "PATIENT COHORT"}</h3>
                 </div>
-                <div className="text-[10px] font-mono text-slate-500 truncate max-w-[200px]">
-                    {patients.length > 0 ? `${patients.length} RECORDS` : debugInfo}
+                <div className="text-[10px] font-mono text-slate-500 truncate max-w-[300px]">
+                    {patients.length > 0 ? `${patients.length} RECORDS • REAL HEALTH DATA` : debugInfo}
                 </div>
             </div>
 
@@ -101,19 +159,23 @@ export const PatientTable = ({
             >
                 {patients.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-slate-500 gap-2">
-                        {!finalMemoryKey ? (
-                            <span className="text-xs font-mono text-orange-500">
-                                AI_MISSING_DATA_KEY
-                            </span>
-                        ) : isLoading ? (
+                        {isLoading || isLoadingReal ? (
                             <>
                                 <div className="w-6 h-6 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
-                                <span className="text-xs font-mono animate-pulse">SYNCING_NODE...</span>
+                                <span className="text-xs font-mono animate-pulse">LOADING REAL HEALTH DATA...</span>
+                                <span className="text-[10px] text-slate-600">HealthData.gov • CDC • CMS Open Data</span>
                             </>
-                        ) : (
-                            <span className="text-xs font-mono text-slate-600">
-                                {error ? `Backend Error: ${error.message}` : "INITIALIZING_STREAM..."}
+                        ) : error && !realDataLoaded ? (
+                            <span className="text-xs font-mono text-red-500">
+                                ERROR: {error.message}
                             </span>
+                        ) : (
+                            <>
+                                <div className="w-6 h-6 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
+                                <span className="text-xs font-mono text-slate-600">
+                                    INITIALIZING DATA STREAM...
+                                </span>
+                            </>
                         )}
                     </div>
                 ) : (
