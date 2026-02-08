@@ -11,14 +11,15 @@ import os
 from datetime import datetime
 
 # Initialize FastMCP
-from mcp.server.transport_security import TransportSecuritySettings
+mcp = FastMCP("tambo-pulse-medical")
 
-# Initialize FastMCP with DNS rebinding protection DISABLED
-# Required for Render/Cloudflare production environments
-mcp = FastMCP(
-    "tambo-pulse-medical",
-    transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False)
-)
+# CRITICAL EMERGENCY FIX: Monkey-patch the MCP SDK's internal security checks.
+# The SDK's DNS rebinding protection rejects production Host headers like 'onrender.com',
+# leading to the 421 Misdirected Request error. By forcing these validators to return True,
+# we allow the production handshake to complete.
+from mcp.server.transport_security import TransportSecurityMiddleware
+TransportSecurityMiddleware._validate_host = lambda self, host: True
+TransportSecurityMiddleware._validate_origin = lambda self, origin: True
 
 def log_debug(msg):
     try:
@@ -149,9 +150,9 @@ async def get_department_summary():
         "memory_key": memory_key
     }
 
-# Standard FastAPI entry point with trailing slash fix
 # Standard FastAPI entry point
-app = FastAPI(title="Tambo Pulse MCP Server")
+# redirect_slashes=False is important to prevent ASGI-level 307 redirects for the /sse route
+app = FastAPI(title="Tambo Pulse MCP Server", redirect_slashes=False)
 
 app.add_middleware(
     CORSMiddleware,
@@ -165,14 +166,15 @@ app.add_middleware(
 async def health_check():
     return {"status": "healthy"}
 
-# Mount the MCP SSE app using standard mounting
-# Now that rebinding protection is OFF, this will work on Render
-app.mount("/sse", mcp.sse_app())
+# Mount the MCP SSE app at the root.
+# This means the internal '/sse' route is exposed at https://domain/sse
+# and the internal '/messages/' route is exposed at https://domain/messages/
+app.mount("/", mcp.sse_app())
 
 if __name__ == "__main__":
     import uvicorn
     import os
     port = int(os.getenv("PORT", 8000))
     print(f"🚀 Starting Tambo Pulse MCP Server on port {port}")
-    # Force trust for Render's proxy headers
+    # proxy_headers=True is mandatory for Render to correctly identify protocol and host
     uvicorn.run(app, host="0.0.0.0", port=port, proxy_headers=True, forwarded_allow_ips="*")
