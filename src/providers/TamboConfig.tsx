@@ -49,9 +49,6 @@ export const TamboConfig = ({ children }: { children: ReactNode }) => {
                     transport: MCPTransport.SSE,
                 },
             ]}
-            onError={(error) => {
-                console.error("🔴 TamboProvider Error:", error);
-            }}
         >
             <TamboMcpProvider>
                 {children}

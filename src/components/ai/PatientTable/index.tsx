@@ -219,8 +219,8 @@ export const PatientTable = ({
                                     <div className="w-1/4 flex gap-3 text-[10px] font-mono">
                                         <div className="flex flex-col">
                                             <span className="text-slate-600 uppercase">SpO2</span>
-                                            <span className={`${patient.vitals?.spo2 < 90 ? 'text-red-400 animate-pulse font-bold' : 'text-emerald-400'}`}>
-                                                {patient.vitals?.spo2 || "--"}%
+                                            <span className={`${(patient.vitals?.spo2 || patient.vitals?.oxygen_saturation) < 90 ? 'text-red-400 animate-pulse font-bold' : 'text-emerald-400'}`}>
+                                                {patient.vitals?.spo2 || patient.vitals?.oxygen_saturation || "--"}%
                                             </span>
                                         </div>
                                         <div className="flex flex-col">
@@ -229,7 +229,10 @@ export const PatientTable = ({
                                         </div>
                                         <div className="flex flex-col">
                                             <span className="text-slate-600 uppercase">BP</span>
-                                            <span className="text-slate-300">{patient.vitals?.bp_systolic}/{patient.vitals?.bp_diastolic}</span>
+                                            <span className="text-slate-300">
+                                                {patient.vitals?.bp_systolic || patient.vitals?.blood_pressure_systolic || "--"}/
+                                                {patient.vitals?.bp_diastolic || patient.vitals?.blood_pressure_diastolic || "--"}
+                                            </span>
                                         </div>
                                     </div>
                                     <div className="w-1/8 text-right flex-1">
