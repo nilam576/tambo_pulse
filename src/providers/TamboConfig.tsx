@@ -14,7 +14,14 @@ export const TamboConfig = ({ children }: { children: ReactNode }) => {
                 {
                     name: "tambo-pulse-medical",
                     serverKey: "pulse",
-                    url: process.env.NEXT_PUBLIC_MCP_SERVER_URL || "http://127.0.0.1:8000/mcp/sse",
+                    url: (() => {
+                        let baseUrl = process.env.NEXT_PUBLIC_MCP_SERVER_URL || "http://127.0.0.1:8000/mcp/sse";
+                        // Safety: If the user provided just the domain, append the path
+                        if (baseUrl.startsWith("http") && !baseUrl.endsWith("/mcp/sse")) {
+                            baseUrl = baseUrl.replace(/\/$/, "") + "/mcp/sse";
+                        }
+                        return baseUrl;
+                    })(),
                     transport: MCPTransport.SSE,
                 },
             ]}
