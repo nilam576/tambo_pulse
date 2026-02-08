@@ -142,7 +142,7 @@ async def get_department_summary():
         "memory_key": memory_key
     }
 
-# Robust FastAPI construction
+# Standard FastAPI entry point
 app = FastAPI(title="Tambo Pulse MCP Server")
 
 app.add_middleware(
@@ -153,13 +153,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Route health check directly on the main app
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
 
-# Mount the MCP SSE app using standard FastAPI mounting
-# This ensures the sub-app receives the correct scope and context
-app.mount("/sse", mcp.sse_app())
+# Mount the MCP SSE app at the root. 
+# This exposes the internal '/sse' endpoint at the top level: https://domain/sse
+app.mount("/", mcp.sse_app())
 
 if __name__ == "__main__":
     import uvicorn
