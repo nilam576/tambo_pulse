@@ -144,8 +144,8 @@ async def get_department_summary():
 
 from starlette.responses import JSONResponse
 
-# Consolidate into a single app instance to avoid path/prefix issues on Render
-app = mcp.sse_app()
+# Consolidate into a single FastAPI app for better control
+app = FastAPI(title="Tambo Pulse MCP Server")
 
 app.add_middleware(
     CORSMiddleware,
@@ -155,13 +155,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.route("/health")
-async def health_check(request):
-    return JSONResponse({"status": "healthy"})
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
+# Mount the MCP SSE app at /sse
+# This means requests to /sse will be handled by the MCP SSE handler
+app.mount("/sse", mcp.sse_app())
 
 if __name__ == "__main__":
     import uvicorn
     import os
     port = int(os.getenv("PORT", 8000))
     print(f"🚀 Starting Tambo Pulse MCP Server on port {port}")
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    # proxy_headers=True and forwarded_allow_ips="*" are CRITICAL for Render to avoid 421 errors
+    uvicorn.run(app, host="0.0.0.0", port=port, proxy_headers=True, forwarded_allow_ips="*")
